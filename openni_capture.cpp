@@ -104,7 +104,7 @@ void parseCommandLine( int argc, char* argv[], bool& isColorizeDisp, bool& isFix
     isFixedMaxDisp = false;
     imageMode = 0;
 
-    retrievedImageFlags[0] = false;
+    retrievedImageFlags[0] = true;
     retrievedImageFlags[1] = true;
     retrievedImageFlags[2] = false;
     retrievedImageFlags[3] = true;
@@ -186,6 +186,8 @@ int main( int argc, char* argv[] )
     bool isVideoReading;
     parseCommandLine( argc, argv, isColorizeDisp, isFixedMaxDisp, imageMode, retrievedImageFlags, filename, isVideoReading );
 
+
+
     cout << "Device opening ..." << endl;
     VideoCapture capture;
     if( isVideoReading )
@@ -200,6 +202,10 @@ int main( int argc, char* argv[] )
         cout << "Can not open a capture object." << endl;
         return -1;
     }
+
+Size size = Size(capture.get(CV_CAP_PROP_FRAME_WIDTH),capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+	int codec = CV_FOURCC('D', 'I', 'V', 'X');    
+	VideoWriter writer("video.avi",codec,capture.get(CV_CAP_PROP_FPS),size,0);
 
     if( !isVideoReading )
     {
@@ -264,6 +270,7 @@ int main( int argc, char* argv[] )
                 const float scaleFactor = 0.05f;
                 Mat show; depthMap.convertTo( show, CV_8UC1, scaleFactor );
                 imshow( "depth map", show );
+				writer.write(show);
             }
 
             if( retrievedImageFlags[1] && capture.retrieve( disparityMap, CV_CAP_OPENNI_DISPARITY_MAP ) )
