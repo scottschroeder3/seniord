@@ -14,7 +14,7 @@ using namespace std;
 /**
  *
  */
-Mat thresholdDistance(Mat input, int lowBound, int highBound){
+Mat thresholdDistance(Mat input, short lowBound, short highBound){
     
     Mat output;
     
