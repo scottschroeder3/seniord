@@ -35,6 +35,90 @@ short findHandDist(Mat input){
     
 }
 
+//Probably a good idea to only keep track of motionhistory once a gesture is started.
+
+/**
+ *Function to track and draw the tracked path of an object using moments
+ *NOTE: This function will only work if there is one object in the image.
+ */
+IplImage* drawTracking(IplImage* threshed, IplImage* trackedImage){
+    
+    //Find the moments of the incoming image
+    CvMoments* moments = (CvMoments*)malloc(sizeof(CvMoments));
+    cvMoments(threshed,moments,1);
+    double momentFirst = cvGetSpatialMoment(moments,1,0);
+    double momentSecond = cvGetSpatialMoment(moments,0,1);
+    double area = cvGetCentralMoment(moments,0,0);
+    
+    //Check the area to get rid of noise
+    if(area<500){
+        int Xpos = momentFirst/area;
+        int Ypos = momentSecond/area;
+        if(prevX>=0 && prevY>=0 && Xpos>=0 && Ypos>=0){
+            
+            //Draw the tracking line
+            cvLine(trackedImage,cvPoint(Xpos,Ypos),cvPoint(prevX,prevY),cvScalar(255,255,255),5);
+        }
+        //Set the new position to be the old position
+        prevX=Xpos;
+        prevY=Ypos;
+        printf("position (%d,%d)\n",Xpos,Ypos);
+    }
+    //Free used memory
+    free(moments);
+    return trackedImage;
+}
+
+/*
+ *Function to remove all objects in an image smaller than a given size. Similar functionality to Matlab's bwareaopen.
+ */
+int eraseSmallObjects(IplImage *image, int size)
+{
+    
+    CvMemStorage *storage;
+    CvSeq *contour = NULL;
+    CvScalar white, black;
+    IplImage *input = NULL; // cvFindContours changes the input
+    double area;
+    int foundCountours = 0;
+    
+    black = CV_RGB( 0, 0, 0 );
+    white = CV_RGB( 255, 255, 255 );
+    
+    if(image == NULL || size == 0)
+        return(foundCountours);
+    
+    input = cvCloneImage(image);
+    
+    storage = cvCreateMemStorage(0);
+    
+    cvFindContours(input, storage, &contour, sizeof (CvContour),
+                   CV_RETR_LIST,
+                   CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0));
+    int i=0;
+    while(contour)
+    {
+        area = cvContourArea(contour, CV_WHOLE_SEQ );
+        if( -size <= area && area <= 0)
+        { // removes white dots
+            cvDrawContours( image, contour, black, black, -1, CV_FILLED, 8 );
+            foundCountours++;
+        }
+        else
+        {
+            //if( 0 < area && area <= size) // fills in black holes
+            cvDrawContours( image, contour, white, white, -1, CV_FILLED, 8 );
+            foundCountours++;
+        }
+        contour = contour->h_next;
+        i++;
+    }
+    
+    cvReleaseMemStorage( &storage ); // desallocate CvSeq as well.
+    cvReleaseImage(&input);
+    return(foundCountours);
+    
+}
 
 
 
