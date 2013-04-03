@@ -96,8 +96,19 @@ Mat findHand(Mat input){
 			vector<Vec4i> defects( contours.size() );
 
 
+			//Tom's test section for finding centroids
+			//vector<Point2f> centers = getBlobCenters(contours)
+					
+
+
+			//End of Tom's test section
+
+
+
+
 			if (contours.size()) {
                 for (int i = 0; i < contours.size(); i++) {
+
                     vector<Point> contour = contours[i];
                     Mat contourMat = Mat(contour);
                     double cArea = contourArea(contourMat);
@@ -106,6 +117,7 @@ Mat findHand(Mat input){
                     {
                         Scalar center = mean(contourMat);
                         Point centerPoint = Point(center.val[0], center.val[1]);
+						circle(drawing, centerPoint, 8, COLOR_RED, 2);
 
                         // approximate the contour by a simple curve
                         vector<Point> approxCurve;
