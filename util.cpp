@@ -10,6 +10,26 @@
 using namespace cv;
 using namespace std;
 
+/**
+ *Function to find centroids of all blobs in an image.
+ *May want to expand this to also draw and output the centers of each blob on a new image.
+ */
+vector<Point2f> getBlobCenters(Vector<Point> contours){
+   
+    //Find the moments of each contour
+    vector<Moments> mmnts(contours.size());
+    for(int i=0;i<contours.size();i++){
+        mmnts[i] = moments(contours[i],false);
+    }
+    
+    vector<Point2f> blobCenters(contours.size());
+    for(int i=0;i<contours.size();i++){
+        blobCenters[i] = Point2f(mmnts[i].m10/mmnts[i].m00,mmnts[i].m01/mmnts[i].m00);
+    }
+    
+    return blobCenters;
+    
+}
 
 /**
  *
