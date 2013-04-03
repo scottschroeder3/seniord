@@ -1,3 +1,6 @@
+#include "/home/seniord/Kinect/OpenNI/Include/"
+
+
 #define GESTURE_TO_USE "Click" xn::GestureGenerator g_GestureGenerator;
 xn::HandsGenerator g_HandsGenerator;
 void XN_CALLBACK_TYPE Gesture_Recognized(xn::GestureGenerator& generator,
