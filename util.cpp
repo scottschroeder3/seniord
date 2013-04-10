@@ -14,6 +14,7 @@ using namespace std;
  *Function to find centroids of all blobs in an image.
  *May want to expand this to also draw and output the centers of each blob on a new image.
  */
+/*
 vector<Point2f> getBlobCenters(Vector<Point> contours){
    
     //Find the moments of each contour
@@ -30,11 +31,12 @@ vector<Point2f> getBlobCenters(Vector<Point> contours){
     return blobCenters;
     
 }
+*/
 
 /**
  *
  */
-Mat thresholdDistance(Mat input, short lowBound, short highBound){
+Mat thresholdDistance(Mat input, unsigned short lowBound, unsigned short highBound){
     
     Mat output;
     
@@ -44,6 +46,8 @@ Mat thresholdDistance(Mat input, short lowBound, short highBound){
     return output;
 }
 
+
+/*
 //Use the following function to find the distance of the hand object in the frame. After this distance is found it will be stored for further use. It can then be used in calls to thresholdDistance so that the image only contains objects within a certain distance of the plane of interest. Use the values handDistance-150 and handDistance+50. (15cm in front of hand and 5cm in back.
 
 short findHandDist(Mat input){
@@ -55,12 +59,18 @@ short findHandDist(Mat input){
     
 }
 
+
+*/
+
+
 //Probably a good idea to only keep track of motionhistory once a gesture is started.
 
 /**
  *Function to track and draw the tracked path of an object using moments
  *NOTE: This function will only work if there is one object in the image.
  */
+
+/*
 IplImage* drawTracking(IplImage* threshed, IplImage* trackedImage){
     
     //Find the moments of the incoming image
@@ -89,9 +99,12 @@ IplImage* drawTracking(IplImage* threshed, IplImage* trackedImage){
     return trackedImage;
 }
 
+*/
+
 /*
  *Function to remove all objects in an image smaller than a given size. Similar functionality to Matlab's bwareaopen.
  */
+/*
 int eraseSmallObjects(IplImage *image, int size)
 {
     
@@ -140,7 +153,7 @@ int eraseSmallObjects(IplImage *image, int size)
     
 }
 
-
+*/
 
 /*
 

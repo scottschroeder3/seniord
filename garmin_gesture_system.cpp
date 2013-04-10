@@ -4,6 +4,7 @@
 #include "highgui.h"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "gesture_util.h"
+#include "util.h"
 #include "opencv2/core/core.hpp"
 #include "opencv2/video/tracking.hpp"
 
@@ -16,6 +17,8 @@ const Scalar COLOR_DARK_GREEN  = Scalar(0, 255, 0);
 const Scalar COLOR_LIGHT_GREEN = Scalar(0,255,0);
 const Scalar COLOR_YELLOW      = Scalar(0,128,200);
 const Scalar COLOR_RED         = Scalar(0,0,255);
+
+int seconds_count;
 
 struct ConvexityDefect
 {
@@ -77,13 +80,16 @@ void findConvexityDefects(vector<Point>& contour, vector<int>& hull, vector<Conv
     cvReleaseMemStorage(&contourStr);
     cvReleaseMemStorage(&strDefects);
     cvReleaseMemStorage(&storage);
+	free(defectArray);
 
     }
 }
 
 
 
-Mat findHand(Mat input){
+bool findHand(Mat input, Mat colorImage){
+
+			bool handfound=false;
 
    			Mat drawing = Mat::zeros( input.size(), CV_8UC3 );
 			vector<Vec4i> hierarchy;
@@ -103,8 +109,7 @@ Mat findHand(Mat input){
 
 			//End of Tom's test section
 
-
-
+			
 
 			if (contours.size()) {
                 for (int i = 0; i < contours.size(); i++) {
@@ -112,8 +117,9 @@ Mat findHand(Mat input){
                     vector<Point> contour = contours[i];
                     Mat contourMat = Mat(contour);
                     double cArea = contourArea(contourMat);
+					//printf("area: %lf.\n", cArea);
 
-                    if(cArea > 300) // likely the hand
+                    if(cArea > 7000 && cArea < 30000) // likely the hand
                     {
                         Scalar center = mean(contourMat);
                         Point centerPoint = Point(center.val[0], center.val[1]);
@@ -121,7 +127,7 @@ Mat findHand(Mat input){
 
                         // approximate the contour by a simple curve
                         vector<Point> approxCurve;
-                        approxPolyDP(contourMat, approxCurve, 4, true);
+                        approxPolyDP(contourMat, approxCurve, 10, true);
 
                         vector< vector<Point> > debugContourV;
                         debugContourV.push_back(approxCurve);
@@ -141,16 +147,47 @@ Mat findHand(Mat input){
                         // find convexity defects
                         vector<ConvexityDefect> convexDefects;
                         findConvexityDefects(approxCurve, hull, convexDefects);
-                        printf("Number of defects: %d.\n", (int) convexDefects.size());
+                        //printf("Number of defects: %d.\n", (int) convexDefects.size());
 
                         for(int j = 0; j < convexDefects.size(); j++)
                         {
                             circle(drawing, convexDefects[j].depth_point, 3, COLOR_BLUE, 2);
-							circle(drawing, convexDefects[j].start, 3, COLOR_DARK_GREEN, 2);
-							circle(drawing, convexDefects[j].end, 3, COLOR_RED, 2);
+							//circle(drawing, convexDefects[j].start, 3, COLOR_DARK_GREEN, 2);
+							//circle(drawing, convexDefects[j].end, 3, COLOR_RED, 2);
 
                         }
-                        
+
+						if(convexDefects.size()>=4 && convexDefects.size()<=8)
+						{
+							float totalDepth = 0;
+							for(int j = 0; j < convexDefects.size(); j++)
+							{
+								totalDepth+=convexDefects[j].depth;
+							}
+							printf("Total depth: %lf.\n", totalDepth);
+							if(totalDepth>160)
+							{
+								drawContours(drawing, debugContourV, 0, COLOR_YELLOW, 5);
+								seconds_count+=1;
+							}
+							else
+							{
+								seconds_count=0;
+							}
+						}
+						else
+						{
+							seconds_count=0;
+						}
+						if(seconds_count>8)
+						{
+							//printf("Hand!     ");
+							handfound=true;
+							drawContours(drawing, debugContourV, 0, COLOR_RED, 5);
+							drawContours(colorImage, debugContourV, 0, COLOR_RED, 5);
+						}
+						//printf("time: %d.\n", seconds_count);                        
+
                         // assemble point set of convex hull
                         vector<Point> hullPoints;
                         for(int k = 0; k < hull.size(); k++)
@@ -169,7 +206,10 @@ Mat findHand(Mat input){
                     }
                 } // contour conditional
 				}
-	return drawing;
+//imshow("BGR",colorImage);
+imshow("wireframe",drawing);
+
+	return handfound;
 }
 
 Mat smoothImage(Mat image){
@@ -194,6 +234,16 @@ int main()
 	Size size = Size(capture.get(CV_CAP_PROP_FRAME_WIDTH),capture.get(CV_CAP_PROP_FRAME_HEIGHT));
 	int codec = CV_FOURCC('D', 'I', 'V', 'X');    
 	VideoWriter writer("video.avi",codec,capture.get(CV_CAP_PROP_FPS),size,0);
+
+	namedWindow( "COLOR", CV_WINDOW_AUTOSIZE );
+	namedWindow( "wireframe", CV_WINDOW_AUTOSIZE );
+	namedWindow( "FILT", CV_WINDOW_AUTOSIZE );
+	namedWindow( "BlobCenters", CV_WINDOW_AUTOSIZE );
+
+	moveWindow("COLOR", 10, 10);
+	moveWindow("wireframe", 710, 10);
+	moveWindow("FILT", 10, 540);
+	moveWindow("BlobCenters", 710, 540);
 	
     if(writer.isOpened())
     {
@@ -202,27 +252,137 @@ int main()
 		Mat bgrImage ;
 		Mat filtered;
 		Mat filtered2;
+
+		//Motion History Mats
+		Mat blobCenters = cvCreateImage(size,IPL_DEPTH_8U,0);
+		int prevX, prevY = -1;
+
+
+		bool foundHand;
+		int gestureTimer;
+		seconds_count=0;
         while ( 1 )
 		{
 			capture.grab();
 			capture.retrieve( depthMap, CV_CAP_OPENNI_DEPTH_MAP );
 			capture.retrieve( bgrImage, CV_CAP_OPENNI_BGR_IMAGE );
 		
-			inRange(depthMap,25,770,filtered);
-			filtered2 = filtered.clone();
+			//imshow("depthmap",depthMap);
+			//Find the minimum value greater than 0 in the matrix
+			//TEST SECTION
+
+			MatConstIterator_<unsigned short> it = depthMap.begin<unsigned short>(), it_end = depthMap.end<unsigned short>();
+			unsigned short minVal=60000;
+			
+			for(;it != it_end; ++it){
+				if(*it<minVal && *it>0){
+					minVal=*it;
+				}
+			}			
+
+			//cout << "minVal: " <<minVal<<endl;
+			unsigned short minRange = minVal-30;
+			unsigned short maxRange = minVal+60;
+
+
+			//cout << "min,max: "<<minRange<<", "<<maxRange<<endl;
+
+			//Perhaps just create another mat with size 8u. This seems to be what happens when
+
+			Mat thtwBitDepth;// = cvCreateImage(size,IPL_DEPTH_32F,0);
+
+			depthMap.convertTo(thtwBitDepth,CV_32F);//,1.0/256,0);
+
+			
+			//imshow("32 Bit",thtwBitDepth);
+
+			filtered2 = thresholdDistance(thtwBitDepth,minRange,maxRange);
+			filtered2 = thresholdDistance(filtered2,25,900);
+			
+
+			//imshow("ThresholdDistance",filtered2);
+
+			//END TEST SECTION
+
+			//inRange(depthMap,25,800,filtered);
+			//filtered2 = filtered.clone();
 			filtered2 = smoothImage(filtered2);
 			imshow("FILT",filtered2);
-			Mat drawing = findHand(filtered2);
 
+
+			Mat thtwsfiltered;// = cvCreateImage(size,IPL_DEPTH_8U,0);
+			filtered2.convertTo(thtwsfiltered,CV_8U);
+			filtered2 = thtwsfiltered.clone();
+			
+			if(!foundHand){
+				foundHand = findHand(thtwsfiltered, bgrImage);
+				//foundHand = findHand(filtered2, bgrImage);
+				cout << "found hand = "<< foundHand << endl;
+			} else {
+			
+
+
+				//A hand was detected and now a gesture is being analyzed.
+
+				//Find center of mass of all blobs in window and draw a circle on them.
+				//This image will be fed to the motion history functions.
+
+				std::vector<std::vector<Point> > contours;
+
+				findContours(filtered2,contours,CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+
+            	for (int i = 0; i < contours.size(); i++) {
+
+                	vector<Point> contour = contours[i];
+                	Mat contourMat = Mat(contour);
+                	double cArea = contourArea(contourMat);
+
+                	if(cArea > 7000 && cArea < 30000) // likely the hand
+                	{
+                    	Scalar center = mean(contourMat);
+                    	Point centerPoint = Point(center.val[0], center.val[1]);
+						//Point centerPoint = Point(50, 50);
+						
+						if(prevX>=0 && prevY>=0 && center.val[0]>=0 && center.val[1]>=0){
+							line(blobCenters,centerPoint,Point(prevX,prevY),Scalar(255,255,255),30);
+						}
+
+						prevX = center.val[0];
+						prevY = center.val[1];
+						cout <<"(x,y): "<<center.val[0]<<","<<center.val[1]<<endl;
+						//circle(blobCenters, centerPoint, 8, Scalar(255,255,255), -1);
+					}
+				}
+
+				imshow("BlobCenters",blobCenters);
+
+				//At this point we may not need to use motion history. Since I am drawing a line between centroids and not just using multiple centroids overlapping, it may be possible to simply try a template match on blobCenters until something is found.
+
+				//To keep track of moving right or left we could keep two values. Vertical change and horizontal change. These values would be calculate when the line function is called and would be newx-oldx=horizontal and newy-oldy=vertical. Then sum all of these values for entire line. If the values are positive enough that means they are going in the positive x and y directions respectively and if the values are negative enough they are going in the negative x and y directions respectively.
+
+				//NOTE: Only look at horizontal and vertical change after template matching says that a gesture has been matched. A matched gesture means there is either a horizontal or a vertical line. Once this is determined look for the changes in x and y to determine it it is up, down, right , or left.
+
+
+
+
+				if(gestureTimer > 10){
+					//Gesture time has exceeded 10 seconds. Give up on finding gesture.
+					gestureTimer=0;
+					foundHand=0;	
+				}
+
+				//NOTE: Need to add a check to determine if a gesture was determined correctly.
+				//      If it was gestureTimer and foundHand both need to be set to 0.
+
+			}
 
 			/*WRITE TO FILE*/
 			//writer.write(filtered);
 
 			/*DISPLAY IMAGES*/
-			//imshow("COLOR",bgrImage);
-			//imshow("FILT",filtered);
-			imshow("Drawing",drawing);
-
+			imshow("COLOR",bgrImage);
+			
+			//imshow("FILT",thtwsfiltered);
 
             if(waitKey(100)>=0)
 			{
