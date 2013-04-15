@@ -7,6 +7,7 @@
 #include "util.h"
 #include "opencv2/core/core.hpp"
 #include "opencv2/video/tracking.hpp"
+#include "time.h"
 
 using namespace cv;
 using namespace std;
@@ -183,6 +184,7 @@ bool findHand(Mat input, Mat colorImage){
 						{
 							//printf("Hand!     ");
 							handfound=true;
+							seconds_count=0;
 							drawContours(drawing, debugContourV, 0, COLOR_RED, 5);
 							drawContours(colorImage, debugContourV, 0, COLOR_RED, 5);
 						}
@@ -254,13 +256,18 @@ int main()
 		Mat filtered2;
 
 		//Motion History Mats
-		Mat blobCenters = cvCreateImage(size,IPL_DEPTH_8U,0);
+		Mat blobCenters = Mat::zeros(size,CV_8U);
+		imshow("BlobCenters",blobCenters);
 		int prevX, prevY = -1;
 
 
 		bool foundHand;
-		int gestureTimer;
+		clock_t gestureTimer;
 		seconds_count=0;
+
+		int X_Displacement=0;
+		int Y_Displacement=0;
+
         while ( 1 )
 		{
 			capture.grab();
@@ -270,6 +277,9 @@ int main()
 			//imshow("depthmap",depthMap);
 			//Find the minimum value greater than 0 in the matrix
 			//TEST SECTION
+
+			flip(depthMap,depthMap,1);
+			flip(bgrImage,bgrImage,1);
 
 			MatConstIterator_<unsigned short> it = depthMap.begin<unsigned short>(), it_end = depthMap.end<unsigned short>();
 			unsigned short minVal=60000;
@@ -317,7 +327,8 @@ int main()
 			if(!foundHand){
 				foundHand = findHand(thtwsfiltered, bgrImage);
 				//foundHand = findHand(filtered2, bgrImage);
-				cout << "found hand = "<< foundHand << endl;
+				if(foundHand) gestureTimer=clock();
+				//cout << "found hand = "<< foundHand << endl;
 			} else {
 			
 
@@ -337,7 +348,7 @@ int main()
                 	Mat contourMat = Mat(contour);
                 	double cArea = contourArea(contourMat);
 
-                	if(cArea > 7000 && cArea < 30000) // likely the hand
+                	if(cArea > 4000 && cArea < 30000) // likely the hand
                 	{
                     	Scalar center = mean(contourMat);
                     	Point centerPoint = Point(center.val[0], center.val[1]);
@@ -345,31 +356,49 @@ int main()
 						
 						if(prevX>=0 && prevY>=0 && center.val[0]>=0 && center.val[1]>=0){
 							line(blobCenters,centerPoint,Point(prevX,prevY),Scalar(255,255,255),30);
+							line(bgrImage,centerPoint,Point(prevX,prevY),Scalar(0,255,0),15);
+							X_Displacement += (center.val[0]-prevX);
+							Y_Displacement += (center.val[1]-prevY);
 						}
 
 						prevX = center.val[0];
 						prevY = center.val[1];
-						cout <<"(x,y): "<<center.val[0]<<","<<center.val[1]<<endl;
+						//cout <<"Displacement(x,y): "<<X_Displacement<<","<<Y_Displacement<<endl;
 						//circle(blobCenters, centerPoint, 8, Scalar(255,255,255), -1);
 					}
 				}
 
-				imshow("BlobCenters",blobCenters);
 
-				//At this point we may not need to use motion history. Since I am drawing a line between centroids and not just using multiple centroids overlapping, it may be possible to simply try a template match on blobCenters until something is found.
-
-				//To keep track of moving right or left we could keep two values. Vertical change and horizontal change. These values would be calculate when the line function is called and would be newx-oldx=horizontal and newy-oldy=vertical. Then sum all of these values for entire line. If the values are positive enough that means they are going in the positive x and y directions respectively and if the values are negative enough they are going in the negative x and y directions respectively.
-
-				//NOTE: Only look at horizontal and vertical change after template matching says that a gesture has been matched. A matched gesture means there is either a horizontal or a vertical line. Once this is determined look for the changes in x and y to determine it it is up, down, right , or left.
+				if(X_Displacement>160 || X_Displacement<-160 || Y_Displacement>120 || Y_Displacement<-120){
+					
 
 
 
 
-				if(gestureTimer > 10){
+
+
+					gestureTimer=0;
+					foundHand=0;
+					prevX=-1;
+					prevY=-1;
+					X_Displacement=0;
+					Y_Displacement=0;
+					blobCenters = Mat::zeros(size,CV_8U);
+				}
+
+				cout << "Clock: "<<(clock()-gestureTimer)/CLOCKS_PER_SEC<<endl;
+				if(((clock()-gestureTimer)/CLOCKS_PER_SEC)>2){
 					//Gesture time has exceeded 10 seconds. Give up on finding gesture.
 					gestureTimer=0;
-					foundHand=0;	
+					foundHand=0;
+					prevX=-1;
+					prevY=-1;
+					X_Displacement=0;
+					Y_Displacement=0;
+					blobCenters = Mat::zeros(size,CV_8U);
 				}
+
+				imshow("BlobCenters",blobCenters);
 
 				//NOTE: Need to add a check to determine if a gesture was determined correctly.
 				//      If it was gestureTimer and foundHand both need to be set to 0.
