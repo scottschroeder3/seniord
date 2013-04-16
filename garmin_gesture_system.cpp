@@ -21,6 +21,7 @@ const Scalar COLOR_RED         = Scalar(0,0,255);
 
 int seconds_count;
 
+
 struct ConvexityDefect
 {
     Point start;
@@ -88,7 +89,7 @@ void findConvexityDefects(vector<Point>& contour, vector<int>& hull, vector<Conv
 
 
 
-bool findHand(Mat input, Mat colorImage){
+bool findHand(Mat input, Mat colorImage, Point &center_ref){
 
 			bool handfound=false;
 
@@ -125,6 +126,7 @@ bool findHand(Mat input, Mat colorImage){
                         Scalar center = mean(contourMat);
                         Point centerPoint = Point(center.val[0], center.val[1]);
 						circle(drawing, centerPoint, 8, COLOR_RED, 2);
+						center_ref = centerPoint;
 
                         // approximate the contour by a simple curve
                         vector<Point> approxCurve;
@@ -165,7 +167,7 @@ bool findHand(Mat input, Mat colorImage){
 							{
 								totalDepth+=convexDefects[j].depth;
 							}
-							printf("Total depth: %lf.\n", totalDepth);
+							//printf("Total depth: %lf.\n", totalDepth);
 							if(totalDepth>160)
 							{
 								drawContours(drawing, debugContourV, 0, COLOR_YELLOW, 5);
@@ -208,9 +210,10 @@ bool findHand(Mat input, Mat colorImage){
                     }
                 } // contour conditional
 				}
-//imshow("BGR",colorImage);
-imshow("wireframe",drawing);
 
+	//imshow("BGR",colorImage);
+	imshow("wireframe",drawing);
+	  
 	return handfound;
 }
 
@@ -254,6 +257,7 @@ int main()
 		Mat bgrImage ;
 		Mat filtered;
 		Mat filtered2;
+		Point centerOfHand;
 
 		//Motion History Mats
 		Mat blobCenters = Mat::zeros(size,CV_8U);
@@ -325,13 +329,14 @@ int main()
 			filtered2 = thtwsfiltered.clone();
 			
 			if(!foundHand){
-				foundHand = findHand(thtwsfiltered, bgrImage);
+				foundHand = findHand(thtwsfiltered, bgrImage, centerOfHand);
 				//foundHand = findHand(filtered2, bgrImage);
 				if(foundHand) gestureTimer=clock();
 				//cout << "found hand = "<< foundHand << endl;
 			} else {
-			
-
+				
+				//THIS IS THE DEPTH AT THE POINT WHERE THE CENTER OF THE HAND WAS CALCULATED
+				cout  << "depth: " << depthMap.at<unsigned short>(centerOfHand) << endl;
 
 				//A hand was detected and now a gesture is being analyzed.
 
@@ -386,8 +391,8 @@ int main()
 					blobCenters = Mat::zeros(size,CV_8U);
 				}
 
-				cout << "Clock: "<<(clock()-gestureTimer)/CLOCKS_PER_SEC<<endl;
-				if(((clock()-gestureTimer)/CLOCKS_PER_SEC)>2){
+				//cout << "Clock: "<<(clock()-gestureTimer)/CLOCKS_PER_SEC<<endl;
+				if(((clock()-gestureTimer)/CLOCKS_PER_SEC)>=1){
 					//Gesture time has exceeded 10 seconds. Give up on finding gesture.
 					gestureTimer=0;
 					foundHand=0;
