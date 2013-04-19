@@ -8,6 +8,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/video/tracking.hpp"
 #include "time.h"
+#include "math.h"
 
 using namespace cv;
 using namespace std;
@@ -29,6 +30,40 @@ struct ConvexityDefect
     Point depth_point;
     float depth;
 };
+
+/**
+ *Function to calculate the line of best fit for a set of data.
+ *It specifically finds the slope and the correlation coefficient.
+ *
+ */
+double linearRegression(vector<Point> scatter, double * corrCoef){
+	
+	if(scatter==NULL){
+		cout<<"Empty data set!\n");
+		return -1;
+	}
+
+	double sumX=0;
+	double sumY=0;
+	double sumXY=0;
+	double sumXX=0;
+	double sumYY=0;
+
+	for(int i=0; i< scatter.size();i++){
+		//Sum up x
+		sumX = sumX + scatter[i].x;
+		sumY = sumY + scatter[i].y;
+		sumXY = sumXY + scatter[i].x*scatter[i].y;
+		sumXX = sumXX + scatter[i].x*scatter[i].x;
+		sumYY = sumYY + scatter[i].y*scatter[i].y;
+	}
+
+	double slope = (scatter.size()*sumXY-sumX*sumY)/(scatter.size()*sumXX-sumX*sumX);
+
+		*corrCoef = (scatter.size()*sumXY-sumX*sumY)/sqrt((scatter.size()*sumXX-sumX*sumX)*(scatter.size()*sumYY-sumY*sumY));
+
+	return slope;
+}
 
 
 
@@ -377,7 +412,29 @@ int main()
 				if(X_Displacement>160 || X_Displacement<-160 || Y_Displacement>120 || Y_Displacement<-120){
 					
 
+					//Call the linearRegression function to get the slope of the line of best fit and the correlation coefficient.
+					double corrCoef=0;
+					double slope = linearRegression(scatter, &corrCoef);
 
+					if(corrCoef>.8 && slope > -.75 && slope < .75){
+						//This is a horizontal line. Match it with a horizontal swipe.
+						if(X_Displacement>160){
+							//Right swipe
+						}
+						if(X_Displacement<-160){
+							//Left swipe
+						}
+					}
+
+					if(corrCoef>.8 && slope > .75 && slope < -.75){
+						//This is a vertical line. Match it with a vertical swipe.
+						if(Y_Displacement>120){
+							//Up swipe
+						}
+						if(Y_Displacement<-120){
+							//Down swipe
+						}
+					}
 
 
 
