@@ -36,10 +36,11 @@ struct ConvexityDefect
  *It specifically finds the slope and the correlation coefficient.
  *
  */
+
 double linearRegression(vector<Point> scatter, double * corrCoef){
 	
-	if(scatter==NULL){
-		cout<<"Empty data set!\n");
+	if(scatter.empty()){
+		cout<<"Empty data set!"<<endl;
 		return -1;
 	}
 
@@ -299,6 +300,15 @@ int main()
 		imshow("BlobCenters",blobCenters);
 		int prevX, prevY = -1;
 
+		vector<Point> scatter;
+
+					vector<Point> scatter1;
+					scatter1.push_back(Point(200,300));
+					scatter1.push_back(Point(210,310));
+					scatter1.push_back(Point(220,320));
+					scatter1.push_back(Point(230,330));
+					scatter1.push_back(Point(240,340));
+
 
 		bool foundHand;
 		clock_t gestureTimer;
@@ -371,7 +381,7 @@ int main()
 			} else {
 				
 				//THIS IS THE DEPTH AT THE POINT WHERE THE CENTER OF THE HAND WAS CALCULATED
-				cout  << "depth: " << depthMap.at<unsigned short>(centerOfHand) << endl;
+				//cout  << "depth: " << depthMap.at<unsigned short>(centerOfHand) << endl;
 
 				//A hand was detected and now a gesture is being analyzed.
 
@@ -403,10 +413,23 @@ int main()
 
 						prevX = center.val[0];
 						prevY = center.val[1];
+						scatter.push_back(centerPoint);
+						//cout<<scatter<<endl;
 						//cout <<"Displacement(x,y): "<<X_Displacement<<","<<Y_Displacement<<endl;
-						//circle(blobCenters, centerPoint, 8, Scalar(255,255,255), -1);
+						//circle(bgrImage, centerPoint, 8, Scalar(255,0,0), -1);
 					}
 				}
+
+				for (int i = 0;i<scatter.size();i++){
+					circle(bgrImage, scatter[i], 8, Scalar(255,0,0), -1);
+				}
+/*
+				for (int i = 0;i<scatter1.size();i++){
+					circle(bgrImage, scatter1[i], 8, Scalar(255,0,0), -1);
+				}
+*/
+				//circle(bgrImage, scatter[0], 8, Scalar(255,0,0), -1);
+				//circle(bgrImage, scatter[scatter.size()-1], 8, Scalar(255,0,0), -1);
 
 
 				if(X_Displacement>160 || X_Displacement<-160 || Y_Displacement>120 || Y_Displacement<-120){
@@ -414,31 +437,59 @@ int main()
 
 					//Call the linearRegression function to get the slope of the line of best fit and the correlation coefficient.
 					double corrCoef=0;
-					double slope = linearRegression(scatter, &corrCoef);
 
-					if(corrCoef>.8 && slope > -.75 && slope < .75){
+
+					//double slope = linearRegression(scatter1, &corrCoef);
+					double slope = linearRegression(scatter, &corrCoef);
+					//cout<<scatter<<endl;
+					//cout<<"slope: "<<slope<<"  Corr"<<abs(corrCoef)<<endl;
+					if(!scatter.empty()){
+						int first_x = scatter[0].x;
+						int first_y = scatter[0].y;
+						int last_x = scatter[scatter.size()-1].x;
+						int last_y = slope*(last_x - first_x) + first_y;
+						//cout<<scatter[0]<<endl;
+						//cout<<last_x<<" "<<last_y<<endl;
+						line(bgrImage,Point(first_x,first_y),Point(last_x,last_y),Scalar(0,255,255),10);
+					}
+/*
+					if(!scatter1.empty()){
+						int first_x = scatter1[0].x;
+						int first_y = scatter1[0].y;
+						int last_x = scatter1[scatter1.size()-1].x;
+						int last_y = slope*(last_x - first_x) + first_y;
+						//cout<<scatter1[0]<<endl;
+						//cout<<last_x<<" "<<last_y<<endl;
+						line(bgrImage,Point(first_x,first_y),Point(last_x,last_y),Scalar(0,255,255),10);
+					}
+*/
+					if(abs(corrCoef)>.1 && slope > -.5 && slope < .5){
 						//This is a horizontal line. Match it with a horizontal swipe.
 						if(X_Displacement>160){
 							//Right swipe
+							cout<<"next"<<endl;
 						}
 						if(X_Displacement<-160){
 							//Left swipe
+							cout<<"prev"<<endl;
 						}
 					}
 
-					if(corrCoef>.8 && slope > .75 && slope < -.75){
+					if(abs(corrCoef)>.1 && (slope > 2 || slope < -2) ){
 						//This is a vertical line. Match it with a vertical swipe.
 						if(Y_Displacement>120){
-							//Up swipe
+							//Down swipe
+							cout<<"voldown 3"<<endl;
 						}
 						if(Y_Displacement<-120){
-							//Down swipe
+							//Up swipe
+							cout<<"volup 3"<<endl;
 						}
 					}
 
+					imshow("temp",bgrImage);
 
-
-
+					scatter.clear();
 					gestureTimer=0;
 					foundHand=0;
 					prevX=-1;
@@ -451,6 +502,7 @@ int main()
 				//cout << "Clock: "<<(clock()-gestureTimer)/CLOCKS_PER_SEC<<endl;
 				if(((clock()-gestureTimer)/CLOCKS_PER_SEC)>=1){
 					//Gesture time has exceeded 10 seconds. Give up on finding gesture.
+					scatter.clear();
 					gestureTimer=0;
 					foundHand=0;
 					prevX=-1;
